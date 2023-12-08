@@ -30,7 +30,7 @@ namespace AImport
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message + "firstprocess\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
+                Console.WriteLine(ex.Message + "\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
             }
 
         }
@@ -126,7 +126,7 @@ namespace AImport
                     if (GenerateZipFile(objs.fileName.Replace(".zip", ""), objs.filepath))
                     {
                         var storeFilePath = ConfigurationManager.AppSettings["ZipPath"] + "/" + objs.fileName.Replace(".zip", "") + ".zip";
-                        var query = "UPDATE tbl_MIS_File_Download SET Status = 1 ,ProcessStarted = 0 , FilePath = @FilePath , DateTime = @DateTime WHERE Id = @Id";
+                        var query = "UPDATE tbl_MIS_File_Download SET Status = 1 ,ProcessStarted = 0 , FilePath = @FilePath , ProcessDate = @DateTime WHERE Id = @Id";
                         using (SqlCommand cmd = new SqlCommand(query, dbSP))
                         {
                             if (dbSP.State == ConnectionState.Closed)
