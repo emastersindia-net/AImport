@@ -54,6 +54,7 @@ namespace AImport
                     cmd1.Parameters.AddWithValue("@Month", sm.Month);
                     cmd1.Parameters.AddWithValue("@Year", sm.Year);
                     cmd1.Parameters.AddWithValue("@filepath", sm.filepath);
+                    cmd1.Parameters.AddWithValue("@fileName", sm.finalTblName);
                     cmd1.CommandTimeout = 10000;
                     if (cmd1.ExecuteNonQuery() > 0)
                     {
@@ -107,6 +108,7 @@ namespace AImport
                 objs.fileName = objs1.FileName;
                 objs.Id = objs1.Id;
                 objs.dummyfilename = objs1.DummyFileName;
+                var dbID = objs.Id;
                 var queryS = "UPDATE tbl_MIS_File_Download SET ProcessStarted = 1 WHERE Id = @Id";
                 using (SqlCommand cmd = new SqlCommand(queryS, dbSP))
                 {
@@ -121,11 +123,11 @@ namespace AImport
                 }
 
 
-                if (DTTOACCDB(objs, objs.fileName))
+                if (DTTOACCDB(objs, objs.fileName,dbID.ToString()))
                 {
-                    if (GenerateZipFile(objs.fileName.Replace(".zip", ""), objs.filepath))
+                    if (GenerateZipFile(objs.fileName.Replace(".zip", "").Replace("--", "-")+"-"+dbID.ToString(), objs.filepath))
                     {
-                        var storeFilePath = ConfigurationManager.AppSettings["ZipPath"] + "/" + objs.fileName.Replace(".zip", "") + ".zip";
+                        var storeFilePath = ConfigurationManager.AppSettings["ZipPath"] + "/" + objs.fileName.Replace(".zip", "").Replace("--", "-") + "-" + dbID.ToString() + ".zip";
                         var query = "UPDATE tbl_MIS_File_Download SET Status = 1 ,ProcessStarted = 0 , FilePath = @FilePath , ProcessDate = @DateTime WHERE Id = @Id";
                         using (SqlCommand cmd = new SqlCommand(query, dbSP))
                         {
@@ -573,7 +575,7 @@ namespace AImport
             return new string[] { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
         }
 
-        public bool DTTOACCDB(SearchModal objs, string zipfilename)
+        public bool DTTOACCDB(SearchModal objs, string zipfilename,string DBID)
         {
             var connectionString1 = "";
             try
@@ -586,7 +588,7 @@ namespace AImport
                 // Construct the path to the App_Data folder and your Access database file
                 string databasePath = System.IO.Path.Combine(baseDirectory, "App_Data", "misTemplate.accdb");
 
-                var createFolderPath = System.IO.Path.Combine(baseDirectory, "App_Data/" + objs.fileName).Replace(".zip", "");
+                var createFolderPath = System.IO.Path.Combine(baseDirectory, "App_Data/" + objs.fileName.Replace("--","").Replace(".zip", "")+"-"+ DBID);
                 if (!System.IO.Directory.Exists(createFolderPath))
                 {
                     System.IO.Directory.CreateDirectory(createFolderPath);
@@ -607,13 +609,56 @@ namespace AImport
                             var smonth = currentDate.ToString("MMMM");
                             // Your logic here, e.g., print the current date
                             DateTime date = new DateTime(year, DateTime.ParseExact(smonth, "MMMM", System.Globalization.CultureInfo.CurrentCulture).Month, 1);
-                            string strSQL = "SELECT * FROM [" + objs.Data_Type + "] ";
+                            string strSQL = "SELECT * FROM [Export] ";
                             OleDbCommand command = new OleDbCommand(strSQL, connection);
                             OleDbDataAdapter da = new OleDbDataAdapter(command);
                             DataTable dt1 = new DataTable();
                             da.Fill(dt1);
-                            var dbname1 = objs.dummyfilename + "-" + smonth.Substring(0, 3) + "-" + objs.Period_To_Year;
-                            if (createAccessTable(objs.Data_Type, dbname1, dt1.Columns, zipfilename))
+
+                            string strSQL1 = "SELECT * FROM [Import]";
+                            OleDbCommand command1 = new OleDbCommand(strSQL, connection);
+                            OleDbDataAdapter da1 = new OleDbDataAdapter(command);
+                            DataTable dt2 = new DataTable();
+                            da1.Fill(dt2);
+                            var ExporttableName = "";
+                            var ImporttableName = "";
+                            var finalTblName = "";
+                            if (objs.Data_Type == "Export")
+                            {
+                                ExporttableName = "Export" + smonth+ "" + objs.Period_To_Year;
+                                finalTblName = ExporttableName;
+                            }
+                            else
+                            {
+                                ExporttableName = "Export";
+                            }
+                            
+                            if (objs.Data_Type == "Import")
+                            {
+                                ImporttableName = "Import" + smonth + "" + objs.Period_To_Year;
+                                finalTblName = ImporttableName;
+                            }
+                            else
+                            {
+                                ImporttableName = "Import";
+                            }
+
+                            var dbname1 = smonth.Substring(0, 3) + "for" + year;
+                            if (objs.dummyfilename == "Export-" || objs.dummyfilename == "Import-")
+                            {
+                                dbname1 = smonth.Substring(0, 3) + "for" + year;
+                            }
+                            else
+                            {
+                                dbname1 = smonth.Substring(0, 3) + "for" + year;
+                            }
+                            //if (objs.dummyfilename == "Export-" || objs.dummyfilename == "Import-")
+                            //{
+                            //    dbname1 = objs.Data_Type +""+ smonth+ "" + objs.Period_To_Year;
+                            //}
+                            objs.finalTblName = finalTblName;
+                            var tableName = objs.Data_Type + "" + smonth + "" + objs.Period_To_Year; ;
+                            if (createAccessTable(ExporttableName, ImporttableName, dbname1, dt1.Columns, dt2.Columns, zipfilename.Replace("--", "").Replace(".zip", "") + "-" + DBID))
                             {
                                 connection.Close();
                                 baseDirectory2 = AppDomain.CurrentDomain.BaseDirectory;
@@ -655,7 +700,7 @@ namespace AImport
             }
 
         }
-        public bool createAccessTable(string TableName, string dbname, DataColumnCollection dt, string zipfilename)
+        public bool createAccessTable(string TableName1,string TableName2, string dbname, DataColumnCollection dt, DataColumnCollection d2, string zipfilename)
         {
             var connectionpath = "";
             try
@@ -665,7 +710,7 @@ namespace AImport
                 string databasePath = System.IO.Path.Combine(baseDirectory, "App_Data", zipfilename, dbname + ".accdb");
                 if (CreateAccessDatabase(databasePath))
                 {
-                    string createTableStatement = $"CREATE TABLE {TableName} (";
+                    string createTableStatement = $"CREATE TABLE {TableName1} (";
 
                     foreach (DataColumn row in dt)
                     {
@@ -680,6 +725,34 @@ namespace AImport
                     createTableStatement = createTableStatement.TrimEnd(',', ' ');
                     createTableStatement += ")";
                     string connectionString = @"Provider=Microsoft.ACE.OLEDB.12.0;Data Source=" + databasePath + ";Persist Security Info=False;";
+                    connectionpath = connectionString;
+                    using (OleDbConnection DynamicSQLConnection = new OleDbConnection(connectionString))
+                    {
+                        if (DynamicSQLConnection.State == ConnectionState.Closed)
+                        {
+                            DynamicSQLConnection.Open();
+                        }
+                        using (OleDbCommand command = new OleDbCommand(createTableStatement, DynamicSQLConnection))
+                        {
+                            command.ExecuteNonQuery();
+                        }
+                        DynamicSQLConnection.Close();
+                    }
+
+                    createTableStatement = $"CREATE TABLE {TableName2} (";
+
+                    foreach (DataColumn row in d2)
+                    {
+                        string columnName = "[" + row.ColumnName + "]";
+                        string dataType = "varchar(255)";
+
+                        // Append column definition to the CREATE TABLE statement
+                        createTableStatement += $"{columnName} {dataType}, ";
+                    }
+
+                    // Remove the trailing comma and space
+                    createTableStatement = createTableStatement.TrimEnd(',', ' ');
+                    createTableStatement += ")";
                     connectionpath = connectionString;
                     using (OleDbConnection DynamicSQLConnection = new OleDbConnection(connectionString))
                     {

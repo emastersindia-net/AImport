@@ -24,6 +24,7 @@ namespace AImport.Models
         public string WhereQuery { get; set; }
         public string OrderByQuery { get; set; }
         public string Database_Name { get; set; }
+        public string finalTblName { get; set; }
         public string DBName { get; set; }
         public int Id { get; set; }
         public string TBLName { get; set; }
