@@ -24,9 +24,7 @@ namespace AImport
             {
                 var processingData = MIS_List();
                 //file process code//
-                if (processfiles(processingData))
-                {
-                }
+                processfiles(processingData);
             }
             catch (Exception ex)
             {
@@ -68,8 +66,23 @@ namespace AImport
             }
             catch (Exception ex)
             {
+                var fileLog = WriteToFile("\r\n Log Created At : " + DateTime.Now + "\r\n" + ex.Message + "processfile\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
+                var queryS1 = "UPDATE tbl_MIS_File_Download SET ErrorOccured = @ErrorOccured , FileLog = @FileLog WHERE Id = @Id";
+                using (SqlCommand cmd = new SqlCommand(queryS1, dbSP))
+                {
+                    if (dbSP.State == ConnectionState.Closed)
+                    {
+                        dbSP.Open();
+                    }
+                    // Assuming objs.Id is an integer
+                    cmd.Parameters.AddWithValue("@Id", sm.Id);
+                    cmd.Parameters.AddWithValue("@ErrorOccured", ex.Message + "processfile\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
+                    cmd.Parameters.AddWithValue("@FileLog", fileLog);
+                    cmd.ExecuteNonQuery();
+                    dbSP.Close();
+                }
+
                 Console.WriteLine(ex.Message + "\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
-                WriteToFile("\r\n Log Created At : " +DateTime.Now+"\r\n"+ex.Message);
                 return false;
             }
             finally
@@ -81,7 +94,7 @@ namespace AImport
         }
 
 
-        private bool processfiles(List<tbl_MIS_File_Download> model)
+        private void processfiles(List<tbl_MIS_File_Download> model)
         {
             foreach (var objs1 in model)
             {
@@ -109,7 +122,7 @@ namespace AImport
                 objs.Id = objs1.Id;
                 objs.dummyfilename = objs1.DummyFileName;
                 var dbID = objs.Id;
-                var queryS = "UPDATE tbl_MIS_File_Download SET ProcessStarted = 1 WHERE Id = @Id";
+                var queryS = "UPDATE tbl_MIS_File_Download SET ProcessStarted = 1 , ProcessStartDate = @date WHERE Id = @Id";
                 using (SqlCommand cmd = new SqlCommand(queryS, dbSP))
                 {
                     if (dbSP.State == ConnectionState.Closed)
@@ -118,6 +131,7 @@ namespace AImport
                     }
                     // Assuming objs.Id is an integer
                     cmd.Parameters.AddWithValue("@Id", objs.Id);
+                    cmd.Parameters.AddWithValue("@date", DateTime.Now);
                     cmd.ExecuteNonQuery();
                     dbSP.Close();
                 }
@@ -142,9 +156,7 @@ namespace AImport
                             cmd.ExecuteNonQuery();
                             dbSP.Close();
                         }
-                        return true;
                     }
-                    return false;
                 }
                 else
                 {
@@ -164,10 +176,9 @@ namespace AImport
 
                 }
             }
-            return false;
         }
 
-        public void WriteToFile(string Message)
+        public string WriteToFile(string Message)
         {
             string path = AppDomain.CurrentDomain.BaseDirectory + "\\Logs";
             if (!Directory.Exists(path))
@@ -190,6 +201,7 @@ namespace AImport
                     sw.WriteLine(Message);
                 }
             }
+            return filepath;
         }
 
         public bool GenerateZipFile(string dbName, string mainZipPath)
@@ -616,8 +628,8 @@ namespace AImport
                             da.Fill(dt1);
 
                             string strSQL1 = "SELECT * FROM [Import]";
-                            OleDbCommand command1 = new OleDbCommand(strSQL, connection);
-                            OleDbDataAdapter da1 = new OleDbDataAdapter(command);
+                            OleDbCommand command1 = new OleDbCommand(strSQL1, connection);
+                            OleDbDataAdapter da1 = new OleDbDataAdapter(command1);
                             DataTable dt2 = new DataTable();
                             da1.Fill(dt2);
                             var ExporttableName = "";
@@ -695,6 +707,21 @@ namespace AImport
             }
             catch (Exception ex)
             {
+                var fileLog = WriteToFile("\r\n Log Created At : " + DateTime.Now + "\r\n" + ex.Message + "processfile\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
+                var queryS1 = "UPDATE tbl_MIS_File_Download SET ErrorOccured = @ErrorOccured , FileLog = @FileLog WHERE Id = @Id";
+                using (SqlCommand cmd = new SqlCommand(queryS1, dbSP))
+                {
+                    if (dbSP.State == ConnectionState.Closed)
+                    {
+                        dbSP.Open();
+                    }
+                    // Assuming objs.Id is an integer
+                    cmd.Parameters.AddWithValue("@Id", DBID);
+                    cmd.Parameters.AddWithValue("@ErrorOccured", ex.Message + "processfile\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
+                    cmd.Parameters.AddWithValue("@FileLog", fileLog);
+                    cmd.ExecuteNonQuery();
+                    dbSP.Close();
+                }
                 Console.WriteLine(ex.Message + "processfile\r\n" + (ex.InnerException != null ? ex.InnerException.Message : ""));
                 return false;
             }
@@ -745,6 +772,18 @@ namespace AImport
                     {
                         string columnName = "[" + row.ColumnName + "]";
                         string dataType = "varchar(255)";
+                        if (row.ColumnName == "Date")
+                        {
+                            dataType = "datetime"; 
+                        }else if (row.ColumnName == "Qty")
+                        {
+                            dataType = "decimal(18,2)";
+                        }
+                        else if (row.ColumnName == "Rate(INR)")
+                        {
+                            dataType = "decimal(18,2)";
+                        }
+                       
 
                         // Append column definition to the CREATE TABLE statement
                         createTableStatement += $"{columnName} {dataType}, ";
